@@ -96,7 +96,14 @@ def decide_weakness(n: Nation, opponent: Nation) -> None:
     print(f"\n[{n.name}] 国家欠損を決定")
     for i, item in enumerate(n.lost_items, 1):
         print(f"  {i}. {item}")
-    idx = int(ask("いちばん痛い番号を選択: "))
+
+    while True:
+        idx_raw = ask("いちばん痛い番号を選択: ")
+        if idx_raw.isdigit():
+            idx = int(idx_raw)
+            break
+        print("数字で入力してください。")
+
     idx = max(1, min(idx, len(n.lost_items))) - 1
     chosen = n.lost_items[idx]
     print(f"選択: {chosen}")
