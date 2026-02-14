@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>世界、在庫切れ - 今すぐ遊ぶ版</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }
+    .card { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    h1,h2 { margin: 0 0 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    input, select, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #94a3b8; }
+    button { cursor: pointer; background: #0ea5e9; color: white; border: none; }
+    button.sub { background: #334155; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .mono { font-family: ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>世界、在庫切れ（今すぐ遊ぶ版）</h1>
+  <p><strong>このファイル単体で動きます。</strong> GitHubからこの1ファイルをダウンロードして開けばOK（マージ不要）。</p>
+  <p>操作が面倒なら「サンプルで開始」で即プレイできます。</p>
+  <div class="row">
+    <button id="sampleStart" class="sub">サンプルで開始</button>
+    <button id="resetAll" class="sub">最初からやり直す</button>
+  </div>
+
+  <div id="elimination" class="card">
+    <h2>1) 消滅ゲーム（必要5項目）</h2>
+    <p id="stageLabel"></p>
+    <div class="row">
+      <input id="aItem" placeholder="A国の項目" />
+      <input id="bItem" placeholder="B国の項目" />
+      <button id="addItems">登録</button>
+    </div>
+    <p class="mono" id="elimLog"></p>
+  </div>
+
+  <div id="inheritance" class="card hidden">
+    <h2>2) 世襲（国家欠損→空札）</h2>
+    <div class="row">
+      <label>A国弱点色:
+        <select id="aWeak"><option>R</option><option>B</option><option>Y</option></select>
+      </label>
+      <label>B国弱点色:
+        <select id="bWeak"><option>R</option><option>B</option><option>Y</option></select>
+      </label>
+      <button id="startMain">5ターン開始</button>
+    </div>
+    <p>R=🟥誇り / B=🟦信頼 / Y=🟨暇</p>
+  </div>
+
+  <div id="mainGame" class="card hidden">
+    <h2>3) 5ターン本編</h2>
+    <p id="turnLabel"></p>
+    <div class="row">
+      <label>A国カード <select id="aCard"><option>R</option><option>B</option><option>Y</option></select></label>
+      <label>A短文 <input id="aText" placeholder="短文" /></label>
+    </div>
+    <div class="row">
+      <label>B国カード <select id="bCard"><option>R</option><option>B</option><option>Y</option></select></label>
+      <label>B短文 <input id="bText" placeholder="短文" /></label>
+    </div>
+    <div class="row">
+      <button id="playTurn">このターンを実行</button>
+    </div>
+    <p class="mono" id="turnLog"></p>
+    <p class="mono" id="score"></p>
+  </div>
+
+  <script>
+const stages = ["①人類", "②日本", "③京都", "④家", "⑤かばん"];
+const colors = { R: "🟥誇り", B: "🟦信頼", Y: "🟨暇" };
+const nextColor = { R: "B", B: "Y", Y: "R" };
+
+const sampleA = ["空気", "電気", "鴨川", "冷蔵庫", "鍵"];
+const sampleB = ["水", "交通", "寺", "布団", "財布"];
+
+let state;
+
+const $ = (id) => document.getElementById(id);
+
+function initState() {
+  state = {
+    stageIdx: 0,
+    seen: new Set(),
+    aItems: [],
+    bItems: [],
+    weak: { A: "R", B: "B" },
+    turn: 1,
+    scores: { R: 0, B: 0, Y: 0 },
+    past: { A: [], B: [] },
+    twistTurn4: false,
+    tossed: false,
+    finished: false,
+  };
+
+  $("aItem").value = "";
+  $("bItem").value = "";
+  $("aText").value = "";
+  $("bText").value = "";
+  $("elimLog").textContent = "";
+  $("turnLog").textContent = "";
+  $("playTurn").disabled = false;
+  $("elimination").classList.remove("hidden");
+  $("inheritance").classList.add("hidden");
+  $("mainGame").classList.add("hidden");
+  renderElimination();
+}
+
+function renderElimination() {
+  $("stageLabel").textContent = `現在: ${stages[state.stageIdx]}`;
+  $("elimLog").textContent = `A国: ${state.aItems.join(", ")}\nB国: ${state.bItems.join(", ")}`;
+}
+
+function renderTurn() {
+  if (state.finished) {
+    $("turnLabel").textContent = `ゲーム終了: ${endMessage()}`;
+  } else {
+    $("turnLabel").textContent = `Turn ${state.turn}/5 ${state.turn <= 3 ? "(内政)" : "(外交)"}`;
+  }
+  $("score").textContent = `在庫: ${colors.R}=${state.scores.R} / ${colors.B}=${state.scores.B} / ${colors.Y}=${state.scores.Y}`;
+}
+
+function normalizeCard(card, text) {
+  return text.length > 12 ? "Y" : card;
+}
+
+function addScore(color) {
+  if (color === state.weak.A || color === state.weak.B) return `${colors[color]}は空札で+0`;
+  state.scores[color] += 1;
+  return `${colors[color]} +1`;
+}
+
+function endMessage() {
+  const entries = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+  if (entries[0][1] === entries[1][1]) return "白紙合意エンド";
+  return entries[0][0] === "R" ? "開戦エンド" : entries[0][0] === "B" ? "同盟エンド" : "内部崩壊エンド";
+}
+
+$("addItems").onclick = () => {
+  const a = $("aItem").value.trim();
+  const b = $("bItem").value.trim();
+  if (!a || !b) return alert("両方入力してください。");
+  if (state.seen.has(a) || state.seen.has(b)) return alert("重複語は禁止です。");
+
+  state.seen.add(a);
+  state.seen.add(b);
+  state.aItems.push(a);
+  state.bItems.push(b);
+  $("aItem").value = "";
+  $("bItem").value = "";
+  state.stageIdx += 1;
+
+  if (state.stageIdx >= 5) {
+    $("elimination").classList.add("hidden");
+    $("inheritance").classList.remove("hidden");
+  } else {
+    renderElimination();
+  }
+};
+
+$("startMain").onclick = () => {
+  state.weak.A = $("aWeak").value;
+  state.weak.B = $("bWeak").value;
+  $("inheritance").classList.add("hidden");
+  $("mainGame").classList.remove("hidden");
+  renderTurn();
+};
+
+$("playTurn").onclick = () => {
+  if (state.finished) return;
+
+  let aCard = $("aCard").value;
+  let bCard = $("bCard").value;
+  const aText = $("aText").value.trim();
+  const bText = $("bText").value.trim();
+  if (!aText || !bText) return alert("短文を入力してください。");
+
+  aCard = normalizeCard(aCard, aText);
+  bCard = normalizeCard(bCard, bText);
+
+  let note = "";
+  if (state.turn <= 3) {
+    state.past.A.push(aCard);
+    state.past.B.push(bCard);
+  } else {
+    if (!state.past.B.includes(aCard)) {
+      aCard = state.past.B[0];
+      note += `A国カードを ${aCard} に補正（外交は相手の過去カードのみ）\n`;
+    }
+    if (!state.past.A.includes(bCard)) {
+      bCard = state.past.A[0];
+      note += `B国カードを ${bCard} に補正（外交は相手の過去カードのみ）\n`;
+    }
+  }
+
+  let log = note + `A:${colors[aCard]}「${aText}」 / B:${colors[bCard]}「${bText}」\n`;
+
+  if (state.turn === 3 && !state.tossed) {
+    state.twistTurn4 = Math.random() < 0.5;
+    state.tossed = true;
+    log += state.twistTurn4 ? "事件: ねじれ判定ON（Turn4のみ）\n" : "事件なし\n";
+  }
+
+  if (aCard === bCard) {
+    if (state.turn === 4 && state.twistTurn4) {
+      const shifted = nextColor[aCard];
+      log += `ねじれ発動: ${colors[aCard]}共鳴→${addScore(shifted)}`;
+    } else {
+      log += `共鳴成立: ${addScore(aCard)}`;
+    }
+  } else {
+    log += "不共鳴: 変化なし";
+  }
+
+  $("turnLog").textContent = log;
+  $("aText").value = "";
+  $("bText").value = "";
+
+  state.turn += 1;
+  if (state.turn > 5) {
+    state.finished = true;
+    $("playTurn").disabled = true;
+  }
+  renderTurn();
+};
+
+$("sampleStart").onclick = () => {
+  initState();
+  for (let i = 0; i < 5; i += 1) {
+    state.aItems.push(sampleA[i]);
+    state.bItems.push(sampleB[i]);
+    state.seen.add(sampleA[i]);
+    state.seen.add(sampleB[i]);
+  }
+  state.stageIdx = 5;
+  $("elimination").classList.add("hidden");
+  $("inheritance").classList.remove("hidden");
+  $("aWeak").value = "Y";
+  $("bWeak").value = "R";
+  $("elimLog").textContent = `A国: ${state.aItems.join(", ")}\nB国: ${state.bItems.join(", ")}`;
+};
+
+$("resetAll").onclick = initState;
+
+initState();
+  </script>
+</body>
+</html>
