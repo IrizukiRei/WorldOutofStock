@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>世界、在庫切れ - Browser版</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }
+    .card { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    h1,h2 { margin: 0 0 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    input, select, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #94a3b8; }
+    button { cursor: pointer; background: #0ea5e9; color: white; border: none; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .mono { font-family: ui-monospace, Menlo, monospace; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>世界、在庫切れ（Browser版）</h1>
+
+  <div id="elimination" class="card">
+    <h2>1) 消滅ゲーム（必要5項目）</h2>
+    <p id="stageLabel"></p>
+    <div class="row">
+      <input id="aItem" placeholder="A国の項目" />
+      <input id="bItem" placeholder="B国の項目" />
+      <button id="addItems">登録</button>
+    </div>
+    <p class="mono" id="elimLog"></p>
+  </div>
+
+  <div id="inheritance" class="card hidden">
+    <h2>2) 世襲（国家欠損→空札）</h2>
+    <div class="row">
+      <label>A国弱点色:
+        <select id="aWeak"><option>R</option><option>B</option><option>Y</option></select>
+      </label>
+      <label>B国弱点色:
+        <select id="bWeak"><option>R</option><option>B</option><option>Y</option></select>
+      </label>
+      <button id="startMain">5ターン開始</button>
+    </div>
+    <p>R=🟥誇り / B=🟦信頼 / Y=🟨暇</p>
+  </div>
+
+  <div id="mainGame" class="card hidden">
+    <h2>3) 5ターン本編</h2>
+    <p id="turnLabel"></p>
+    <div class="row">
+      <label>A国カード <select id="aCard"><option>R</option><option>B</option><option>Y</option></select></label>
+      <label>A短文 <input id="aText" placeholder="短文" /></label>
+    </div>
+    <div class="row">
+      <label>B国カード <select id="bCard"><option>R</option><option>B</option><option>Y</option></select></label>
+      <label>B短文 <input id="bText" placeholder="短文" /></label>
+    </div>
+    <div class="row">
+      <button id="playTurn">このターンを実行</button>
+    </div>
+    <p class="mono" id="turnLog"></p>
+    <p class="mono" id="score"></p>
+  </div>
+
+  <script src="./game.js"></script>
+</body>
+</html>
